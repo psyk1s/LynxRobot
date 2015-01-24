@@ -1,4 +1,4 @@
-MPASM 03.20.08 Intermediate                    ROBOHARKKA.ASM   1-23-2015  16:32:14         PAGE  1
+MPASM 03.20.08 Intermediate                    ROBOHARKKA.ASM   1-24-2015  13:39:11         PAGE  1
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
@@ -6,28 +6,28 @@ LOC  OBJECT CODE     LINE SOURCE TEXT
 
                       00001  
                       00002 
-                      00003 
-                      00004         list  P=PIC18F452, F=INHX32, C=160, N=0, ST=OFF, MM=OFF, R=DEC, X=ON
-                      00005 
-                      00006     #include "P18F452.INC"  ; Include header file
+                      00003         list  P=PIC18F452, F=INHX32, C=160, N=0, ST=OFF, MM=OFF, R=DEC, X=ON
+                      00004 
+                      00005     #include "P18F452.INC"  ; Include header file
                       00001         LIST
                       00002 
                       00003 ; P18F452.INC  Standard Header File, Version 1.1   Microchip Technology, Inc.
                       00004 
                       01709         LIST
                       01710 
-                      00007 
-300000 FAFF           00008                 __CONFIG  _CONFIG1H, _HS_OSC_1H  ;HS oscillator
-                      00009         __CONFIG  _CONFIG2L, _PWRT_ON_2L & _BOR_ON_2L & _BORV_42_2L  ;Reset
-300002 FEF6           00010         __CONFIG  _CONFIG2H, _WDT_OFF_2H  ;Watchdog timer disabled
-300004 FFFF           00011         __CONFIG  _CONFIG3H, _CCP2MX_ON_3H  ;CCP2 to RC1 (rather than to RB3)
-300006 FFFB           00012         __CONFIG  _CONFIG4L, _LVP_OFF_4L  ;RB5 enabled for I/O
-                      00013 
-                      00014         CBLOCK 0x20             ; Declare variable addresses starting at 0x20
-  00000020            00015           dataL
-                      00016         ENDC
-                      00017 
-000000                00018         ORG    0x000            ; Program starts at 0x000
+                      00006 
+300000 FAFF           00007                 __CONFIG  _CONFIG1H, _HS_OSC_1H  ;HS oscillator
+                      00008         __CONFIG  _CONFIG2L, _PWRT_ON_2L & _BOR_ON_2L & _BORV_42_2L  ;Reset
+300002 FEF6           00009         __CONFIG  _CONFIG2H, _WDT_OFF_2H  ;Watchdog timer disabled
+300004 FFFF           00010         __CONFIG  _CONFIG3H, _CCP2MX_ON_3H  ;CCP2 to RC1 (rather than to RB3)
+300006 FFFB           00011         __CONFIG  _CONFIG4L, _LVP_OFF_4L  ;RB5 enabled for I/O
+                      00012 
+                      00013         CBLOCK 0x20             ; Declare variable addresses starting at 0x20
+  00000020            00014           dataL
+                      00015         ENDC
+                      00016 
+000000                00017         org   0x0000            ; Program starts at 0x000
+                      00018        
                       00019 
                       00020 ; ------------------------------------
                       00021 ; SET BAUD RATE TO COMMUNICATE WITH PC
@@ -35,91 +35,76 @@ LOC  OBJECT CODE     LINE SOURCE TEXT
                       00023 ; Boot Baud Rate = 9600, No Parity, 1 Stop Bit
                       00024 ;
                       00025 
-                      00026 
+000000                00026 MAINLINE
                       00027 
-                      00028        ;;;;;;HARKKA;;;
-                      00029 
-000000 010F           00030         BANKSEL SPBRG
-000002 0E19           00031         movlw D'25'
-000004 6EAF           00032         movwf SPBRG
-000006 010F           00033         BANKSEL TXSTA
-000008 84AC           00034         bsf TXSTA, BRGH
-                      00035 
-00000A 010F           00036         BANKSEL TXSTA
-00000C 0E24           00037         movlw B'00100100'
-00000E 6EAC           00038         movwf TXSTA
-000010 010F           00039         BANKSEL RCSTA
-000012 0E90           00040         movlw B'10010000'
-000014 6EAB           00041         movwf RCSTA
-                      00042 
-                      00043 ;
-                      00044 ; ------------------------------------
-                      00045 ; PROVIDE A SETTLING TIME FOR START UP
-                      00046 ; ------------------------------------
-                      00047 ;
-000016 6A20           00048         clrf dataL
-000018 2E20           00049 settle  decfsz dataL,F
-00001A EF0C F000      00050         goto settle
+000000 D804           00028                 rcall Initial
+000002 D80F           00029         rcall message          
+000004                00030 loop 
+000004 D827           00031         rcall send               ; send the char
+000006 EF02 F000      00032         goto loop
+                      00033 
+                      00034 
+                      00035        ;;;;;;HARKKA;;;
+00000A                00036 Initial
+                      00037 
+                      00038 
+00000A 010F           00039         BANKSEL SPBRG
+00000C 0E19           00040         movlw D'25'
+00000E 6EAF           00041         movwf SPBRG
+000010 010F           00042         BANKSEL TXSTA
+000012 84AC           00043         bsf TXSTA, BRGH
+                      00044 
+000014 010F           00045         BANKSEL TXSTA
+000016 0E24           00046         movlw B'00100100'
+000018 6EAC           00047         movwf TXSTA
+00001A 010F           00048         BANKSEL RCSTA
+00001C 0E90           00049         movlw B'10010000'
+00001E 6EAB           00050         movwf RCSTA
                       00051 
-00001E 50AE           00052         movf RCREG,W
-000020 50AE           00053         movf RCREG,W
-000022 50AE           00054         movf RCREG,W            ; flush receive buffer
-                      00055 ;
-                      00056 ; ---------
-                      00057 ; MAIN LOOP
-                      00058 ; ---------
-                      00059 ;
-000024 D809           00060         rcall message          
-000026                00061 loop 
-000026 D802           00062         rcall send               ; send the char
-000028 EF13 F000      00063         goto loop
-                      00064 
-                      00065 ; -------------------------------------------------------------
-                      00066 ; SEND CHARACTER IN W VIA RS232 AND WAIT UNTIL FINISHED SENDING
-                      00067 ; -------------------------------------------------------------
-                      00068 ;
-                      00069 
-                      00070 
-                      00071 ;;;;;;;;;;;;;;;HARKKA;;;;;;;
-                      00072 
-00002C                00073 send 
-00002C 6EAD           00074       movwf TXREG
-00002E 010F           00075       BANKSEL PIR1
-000030                00076 WaitTX
-000030 A89E           00077        btfss PIR1, TXIF
-000032 EF18 F000      00078        goto WaitTX  
-000036 0012           00079        return  
-                      00080 
-                      00081 
-                      00082 
-                      00083 ;
-                      00084 ; -------
-                      00085 ; MESSAGE
-                      00086 ; -------
-                      00087 ;
-000038 0E23           00088 message movlw  '#'
-00003A EC16 F000      00089         call send
-00003E 0E38           00090         movlw  '8'
-000040 EC16 F000      00091         call send
-000044 0E50           00092         movlw  'P'
-000046 EC16 F000      00093         call send
-00004A 0E37           00094         movlw  '7'
-00004C EC16 F000      00095         call send
-000050 0E35           00096         movlw  '5'
-000052 EC16 F000      00097         call send
-000056 0E30           00098         movlw  '0'
-000058 EC16 F000      00099         call send
-00005C 0E30           00100         movlw  '0'
-00005E EC16 F000      00101         call send
-000062 0E3C           00102         movlw  '<'
-000064 EC16 F000      00103         call send
-000068 0E0D           00104         movlw  0x0D ;CR
-00006A EC16 F000      00105         call send
-00006E 0E3E           00106         movlw  '>'
-000070 EC16 F000      00107         call send
-000074 0012           00108         return
-                      00109 
-                      00110         END 
+000020 0012           00052         return 
+                      00053 
+                      00054 
+                      00055 ; -------------------------------------------------------------
+                      00056 ; SEND CHARACTER IN W VIA RS232 AND WAIT UNTIL FINISHED SENDING
+                      00057 ; -------------------------------------------------------------
+                      00058 ;
+                      00059 
+                      00060 
+                      00061 ;
+                      00062 ; -------
+                      00063 ; MESSAGE
+                      00064 ; -------
+                      00065 ;
+000022 0E23           00066 message movlw  '#'
+000024 EC2A F000      00067         call send
+000028 0E38           00068         movlw  '8'
+00002A EC2A F000      00069         call send
+00002E 0E50           00070         movlw  'P'
+000030 EC2A F000      00071         call send
+000034 0E37           00072         movlw  '7'
+000036 EC2A F000      00073         call send
+00003A 0E35           00074         movlw  '5'
+00003C EC2A F000      00075         call send        
+000040 0E30           00076         movlw  '0'
+000042 EC2A F000      00077         call send
+000046 0E30           00078                 movlw  '0'
+000048 EC2A F000      00079         call send
+00004C 0E0D           00080         movlw  0x0D ;CR
+00004E EC2A F000      00081         call send
+000052 0012           00082         return
+                      00083 
+                      00084 
+000054                00085 send 
+000054 6EAD           00086       movwf TXREG
+000056 010F           00087       BANKSEL PIR1
+000058                00088 WaitTX
+000058 A89E           00089        btfss PIR1, TXIF
+00005A EF2C F000      00090        goto WaitTX  
+00005E 0012           00091        return  
+                      00092 
+                      00093 
+                      00094 
+                      00095         END 
 
 Errors   :     0
 Warnings :     0 reported,     0 suppressed
