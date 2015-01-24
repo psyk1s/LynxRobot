@@ -1,6 +1,5 @@
  
 
-
 	list  P=PIC18F452, F=INHX32, C=160, N=0, ST=OFF, MM=OFF, R=DEC, X=ON
 
     #include "P18F452.INC"  ; Include header file
@@ -15,17 +14,27 @@
           dataL
         ENDC
 
-        ORG    0x000            ; Program starts at 0x000
-
+        org   0x0000            ; Program starts at 0x000
+       
+        goto mainline
 ; ------------------------------------
 ; SET BAUD RATE TO COMMUNICATE WITH PC
 ; ------------------------------------
 ; Boot Baud Rate = 9600, No Parity, 1 Stop Bit
 ;
 
+mainline
+
+		rcall Initial
+        rcall message          
+loop 
+       	rcall send               ; send the char
+       	goto loop
 
 
        ;;;;;;HARKKA;;;
+Initial
+
 
         BANKSEL SPBRG
         movlw D'25'
@@ -40,44 +49,13 @@
         movlw B'10010000'
         movwf RCSTA
 
-;
-; ------------------------------------
-; PROVIDE A SETTLING TIME FOR START UP
-; ------------------------------------
-;
-        clrf dataL
-settle  decfsz dataL,F
-        goto settle
+        return 
 
-        movf RCREG,W
-        movf RCREG,W
-        movf RCREG,W            ; flush receive buffer
-;
-; ---------
-; MAIN LOOP
-; ---------
-;
-        rcall message          
-loop 
-        rcall send               ; send the char
-        goto loop
 
 ; -------------------------------------------------------------
 ; SEND CHARACTER IN W VIA RS232 AND WAIT UNTIL FINISHED SENDING
 ; -------------------------------------------------------------
 ;
-
-
-;;;;;;;;;;;;;;;HARKKA;;;;;;;
-
-send 
-      movwf TXREG
-      BANKSEL PIR1
-WaitTX
-       btfss PIR1, TXIF
-       goto WaitTX  
-       return  
-
 
 
 ;
@@ -94,18 +72,24 @@ message movlw  '#'
         movlw  '7'
         call send
         movlw  '5'
-        call send
+        call send        
         movlw  '0'
         call send
-        movlw  '0'
-        call send
-        movlw  '<'
+		movlw  '0'
         call send
         movlw  0x0D ;CR
         call send
-        movlw  '>'
-        call send
         return
 
-        END 
 
+send 
+      movwf TXREG
+      BANKSEL PIR1
+WaitTX
+       btfss PIR1, TXIF
+       goto WaitTX  
+       return  
+
+
+
+        END 

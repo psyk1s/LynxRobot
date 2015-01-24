@@ -1,0 +1,236 @@
+MPASM 03.20.08 Intermediate                     ROBOKOODI.ASM   1-24-2015  13:41:38         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;;;;;;; Demo3 for QwikFlash board ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00002 ;
+                      00003 ; Use 10 MHz crystal frequency.
+                      00004 ; Use Timer0 for ten millisecond looptime.
+                      00005 ; Blink "Alive" LED for 10 ms every second.
+                      00006 ; Button (SW3 on RD<3>) controls other LEDs
+                      00007 ;
+                      00008 ;;;;;;; Program hierarchy ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00009 ;
+                      00010 ; Mainline
+                      00011 ;   Initial
+                      00012 ;   BlinkAlive
+                      00013 ;   Button
+                      00014 ;   LoopTime
+                      00015 ;
+                      00016 ;;;;;;; Assembler directives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00017 
+                      00018         list  P=PIC18F452, F=INHX32, C=160, N=0, ST=OFF, MM=OFF, R=DEC, X=ON
+                      00019         #include P18F452.inc
+                      00001         LIST
+                      00002 
+                      00003 ; P18F452.INC  Standard Header File, Version 1.1   Microchip Technology, Inc.
+                      00004 
+                      01709         LIST
+                      01710 
+300000 FAFF           00020         __CONFIG  _CONFIG1H, _HS_OSC_1H  ;HS oscillator
+                      00021         __CONFIG  _CONFIG2L, _PWRT_ON_2L & _BOR_ON_2L & _BORV_42_2L  ;Reset
+300002 FEF6           00022         __CONFIG  _CONFIG2H, _WDT_OFF_2H  ;Watchdog timer disabled
+300004 FFFF           00023         __CONFIG  _CONFIG3H, _CCP2MX_ON_3H  ;CCP2 to RC1 (rather than to RB3)
+300006 FFFB           00024         __CONFIG  _CONFIG4L, _LVP_OFF_4L  ;RB5 enabled for I/O
+                      00025 
+                      00026 ;;;;;;; Variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00027 
+                      00028         cblock  0x000           ;Beginning of Access RAM
+  00000000            00029         TMR0LCOPY               ;Copy of sixteen-bit Timer0 used by LoopTime
+  00000001            00030         TMR0HCOPY
+  00000002            00031         INTCONCOPY              ;Copy of INTCON for LoopTime subroutine
+  00000003            00032         ALIVECNT                ;Counter for blinking "Alive" LED
+  00000004            00033     OLDBUTTON       ;Value of button at previous loop
+                      00034         endc
+                      00035 
+                      00036 ;;;;;;; Macro definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00037 
+                      00038 MOVLF   macro  literal,dest
+                      00039         movlw  literal
+                      00040         movwf  dest
+                      00041         endm
+                      00042 
+                      00043 ;;;;;;; Vectors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00044 
+000000                00045         org  0x0000             ;Reset vector
+000000 0000           00046         nop
+000002 EF0E F000      00047         goto  Mainline
+                      00048 
+000008                00049         org  0x0008             ;High priority interrupt vector
+000008 EF04 F000      00050         goto  $                 ;Trap
+                      00051 
+000018                00052         org  0x0018             ;Low priority interrupt vector
+000018 EF0C F000      00053         goto  $                 ;Trap
+                      00054 
+                      00055 ;;;;;;; Mainline program ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00056 
+00001C                00057 Mainline
+00001C D804           00058         rcall  Initial          ;Initialize everything
+00001E                00059 Loop
+00001E D839           00060         rcall  BlinkAlive       ;Blink "Alive" LED
+000020 D83F           00061         rcall  Button       ;Detect button pressed or not, and respond
+000022 D821           00062         rcall  LoopTime         ;Make looptime be ten milliseconds
+000024 D7FC           00063         bra  Loop
+                      00064 
+                      00065 ;;;;;;; Initial subroutine ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00066 ;
+                      00067 ; This subroutine performs all initializations of variables and registers.
+                      00068 
+000026                00069 Initial
+                      00070         MOVLF  B'10000111',ADCON1  ;Enable PORTA & PORTE digital I/O pins
+000026 0E87               M         movlw  B'10000111'
+000028 6EC1               M         movwf  ADCON1
+                      00071         MOVLF  B'01100000',ADCON0  ;A/D converter OFF (bit 0)
+00002A 0E60               M         movlw  B'01100000'
+00002C 6EC2               M         movwf  ADCON0
+                      00072         MOVLF  B'11100001',TRISA   ;Set I/O for PORTA
+00002E 0EE1               M         movlw  B'11100001'
+000030 6E92               M         movwf  TRISA
+                      00073         MOVLF  B'11011100',TRISB   ;Set I/O for PORTB
+000032 0EDC               M         movlw  B'11011100'
+000034 6E93               M         movwf  TRISB
+                      00074         MOVLF  B'11010000',TRISC   ;Set I/0 for PORTC
+000036 0ED0               M         movlw  B'11010000'
+000038 6E94               M         movwf  TRISC
+                      00075         MOVLF  B'00001111',TRISD   ;Set I/O for PORTD
+00003A 0E0F               M         movlw  B'00001111'
+00003C 6E95               M         movwf  TRISD
+                      00076         MOVLF  B'00000000',TRISE   ;Set I/O for PORTE
+00003E 0E00               M         movlw  B'00000000'
+000040 6E96               M         movwf  TRISE
+                      00077         MOVLF  B'10001000',T0CON   ;Set up Timer0 for a looptime of 10 ms
+000042 0E88               M         movlw  B'10001000'
+000044 6ED5               M         movwf  T0CON
+                      00078         MOVLF  B'00010000',PORTA   ;Turn off all four LEDs driven from PORTA
+000046 0E10               M         movlw  B'00010000'
+000048 6E80               M         movwf  PORTA
+00004A 6A04           00079     CLRF   OLDBUTTON       ;OLDBUTTON <= 0
+00004C 6A03           00080     CLRF   ALIVECNT        ;ALIVECNT <= 0
+                      00081 
+                      00082 
+00004E 010F           00083         BANKSEL SPBRG
+000050 0E19           00084         movlw D'25'
+000052 6EAF           00085         movwf SPBRG
+000054 010F           00086         BANKSEL TXSTA
+000056 84AC           00087         bsf TXSTA, BRGH
+                      00088 
+000058 010F           00089         BANKSEL TXSTA
+00005A 0E24           00090         movlw B'00100100'
+00005C 6EAC           00091         movwf TXSTA
+00005E 010F           00092         BANKSEL RCSTA
+000060 0E90           00093         movlw B'10010000'
+000062 6EAB           00094         movwf RCSTA
+                      00095 
+000064 0012           00096         return
+                      00097 
+                      00098 ;;;;;;; LoopTime subroutine ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00099 ;
+                      00100 ; This subroutine waits for Timer0 to complete its ten millisecond count
+                      00101 ; sequence. As shown in lecture 4.
+                      00102 
+  00009E66            00103 Bignum  equ     65536-25000+12+2
+                      00104 
+000066                00105 LoopTime
+000066 A4F2           00106         btfss   INTCON,TMR0IF       ;Wait until ten milliseconds are up
+000068 D7FE           00107         bra     LoopTime
+00006A CFF2 F002      00108         movff   INTCON,INTCONCOPY   ;Disable all interrupts to CPU
+00006E 9EF2           00109         bcf     INTCON,GIEH     
+000070 CFD6 F000      00110         movff   TMR0L,TMR0LCOPY     ;Read 16-bit counter at this moment
+000074 CFD7 F001      00111         movff   TMR0H,TMR0HCOPY
+000078 0E66           00112         movlw   low  Bignum
+00007A 2600           00113         addwf   TMR0LCOPY,F
+00007C 0E9E           00114         movlw   high  Bignum
+00007E 2201           00115         addwfc  TMR0HCOPY,F
+000080 C001 FFD7      00116         movff   TMR0HCOPY,TMR0H
+000084 C000 FFD6      00117         movff   TMR0LCOPY,TMR0L     ;Write 16-bit counter at this moment
+000088 5002           00118         movf    INTCONCOPY,W        ;Restore GIEH interrupt enable bit
+00008A 0B80           00119         andlw   B'10000000'
+00008C 12F2           00120         iorwf   INTCON,F
+00008E 94F2           00121         bcf     INTCON,TMR0IF       ;Clear Timer0 flag
+000090 0012           00122         return
+                      00123 
+                      00124 ;;;;;;; BlinkAlive subroutine ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00125 ;
+                      00126 ; This subroutine briefly blinks the LED next to the PIC every second.
+                      00127 
+000092                00128 BlinkAlive
+000092 8880           00129         bsf     PORTA,RA4         ;Turn off LED ('1' => OFF for LED D2)
+000094 0603           00130         decf    ALIVECNT,F        ;Decrement loop counter and return if not zero
+000096 E103           00131         bnz     BAend
+                      00132         MOVLF   100,ALIVECNT      ;Reinitialize BLNKCNT
+000098 0E64               M         movlw  100
+00009A 6E03               M         movwf  ALIVECNT
+00009C 9880           00133         bcf     PORTA,RA4         ;Turn on LED for ten milliseconds 
+00009E                00134 BAend
+00009E 0012           00135         return
+                      00136 
+                      00137 ;;;;;;; Button subroutine ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00138 ;
+                      00139 ; This subroutine detects if button has been pressed, and toggles leds 
+                      00140 ; accordingly.
+                      00141 ;
+                      00142 
+0000A0                00143 Button
+0000A0 5083           00144     movf    PORTD, w
+0000A2 0B08           00145     andlw   b'00001000'       ;Leaves only the button bit, others <= 0
+0000A4 6204           00146     cpfseq  OLDBUTTON
+0000A6 D001           00147     bra Do_Button     ;If changed, go to Do_Button
+0000A8 0012           00148     return
+0000AA                00149 Do_Button
+0000AA 6E04           00150     movwf   OLDBUTTON
+0000AC B604           00151     btfsc   OLDBUTTON, 3      ;Find only falling edges, return on rising
+0000AE 0012           00152     return
+                      00153 
+                      00154 
+0000B0 D803           00155     rcall message
+0000B2 D81B           00156     rcall send
+                      00157 
+                      00158                   ;This is the code executed when button has
+                      00159                   ;been pressed (once)
+0000B4 7280           00160     btg PORTA, RA1    ;LED D6 is controlled by PORTA,RA1
+                      00161                   ;LED D5 is controlled by PORTA,RA2
+                      00162                   ;LED D4 is controlled by PORTA,RA3
+                      00163                   ;In all of these '1' => ON
+                      00164 
+                      00165                   ;The button code ends on this return
+0000B6 0012           00166     return
+                      00167     
+                      00168 
+                      00169 
+0000B8 0E23           00170 message movlw  '#'
+0000BA EC75 F000      00171         call send
+0000BE 0E38           00172         movlw  '8'
+0000C0 EC75 F000      00173         call send
+0000C4 0E50           00174         movlw  'P'
+0000C6 EC75 F000      00175         call send
+0000CA 0E37           00176         movlw  '7'
+0000CC EC75 F000      00177         call send
+0000D0 0E35           00178         movlw  '5'
+0000D2 EC75 F000      00179         call send        
+0000D6 0E30           00180         movlw  '0'
+0000D8 EC75 F000      00181         call send
+0000DC 0E30           00182         movlw  '0'
+0000DE EC75 F000      00183         call send
+0000E2 0E0D           00184         movlw  0x0D ;CR
+0000E4 EC75 F000      00185         call send
+0000E8 0012           00186         return
+                      00187 
+                      00188 
+0000EA                00189 send 
+0000EA 6EAD           00190       movwf TXREG
+0000EC 010F           00191       BANKSEL PIR1
+0000EE                00192 WaitTX
+0000EE A89E           00193        btfss PIR1, TXIF
+0000F0 EF77 F000      00194        goto WaitTX  
+0000F4 0012           00195        return  
+                      00196 
+                      00197 
+                      00198         end           ;End the program
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     0 reported,     0 suppressed
+
+
